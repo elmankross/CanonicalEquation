@@ -6,9 +6,12 @@ namespace TestApp.Math
 {
     public class AlgebraicExpression
     {
-        public HashSet<IAlgebraicSummand> Summands { get; private set; }
+        public HashSet<AlgebraicSummand> Summands { get; }
 
-        private AlgebraicExpression() { }
+        private AlgebraicExpression()
+        {
+            Summands = new HashSet<AlgebraicSummand>();
+        }
 
 
         /// <summary>
@@ -20,7 +23,7 @@ namespace TestApp.Math
         /// <returns></returns>
         public static bool TryParse(string input, out AlgebraicExpression expression, out string error)
         {
-            expression = null;
+            expression = new AlgebraicExpression();
             error = null;
 
             if (!CheckContainsValidSymbols(input))
@@ -32,15 +35,58 @@ namespace TestApp.Math
                 return false;
             }
 
-            if (!AlgebraicSummandGroup.TryParse(input, out var summands, out error))
+            if (TryParseSummand(input, out var summands, out error))
             {
-                return false;
+                foreach (var summand in summands)
+                {
+                    expression.Summands.Add(summand);
+                }
             }
 
-            expression = new AlgebraicExpression
+            return true;
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        private static bool TryParseSummand(string input, out HashSet<AlgebraicSummand> summands, out string error)
+        {
+            summands = new HashSet<AlgebraicSummand>();
+            error = null;
+
+            var enumerator = new ExpressionEnumerator(input);
+            while (enumerator.MoveNext())
             {
-                Summands = summands.Summands
-            };
+                if (AlgebraicSummand.TryParse(enumerator.Current, out var simpleSummand, out error))
+                {
+                    summands.Add(simpleSummand);
+                }
+                else
+                {
+                    var (outer, inter) = AlgebraicSummand.Unwrap(enumerator.Current);
+                    if (TryParseSummand(outer, out var outerSummands, out error))
+                    {
+                        if (TryParseSummand(inter, out var interSummands, out error))
+                        {
+                            if (outerSummands.Count > 1)
+                            {
+                                // TODO: SHOULD BE ONLY ONE!
+                            }
+                            else
+                            {
+                                var outerSummand = outerSummands.First();
+                                foreach (var interSummand in interSummands)
+                                {
+                                    outerSummand.AddSubsummand(interSummand);
+                                }
+                                summands.Add(outerSummand);
+                            }
+                        }
+                    }
+                }
+            }
 
             return true;
         }
