@@ -68,7 +68,12 @@ namespace TestApp.Math
         /// </summary>
         public void ToCanonicalForm()
         {
-            // TODO
+            LeftExpression = LeftExpression - RightExpression;
+            if (AlgebraicExpression.TryParse("0", out var rightExpression, out _))
+            {
+                RightExpression = rightExpression;
+            }
+            LeftExpression.Normilize();
         }
 
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -8,17 +9,20 @@ namespace TestApp.Math
 {
     public class AlgebraicSummand : IEquatable<AlgebraicSummand>
     {
-        private const string PATTERN = "^(?<multiplier>[\\-\\+]?\\d*)((?<variable>\\w?)|\\^(?<power>\\d))+$";
+        private static readonly Regex Pattern = new Regex("^(?<multiplier>[\\-\\+]?[\\.\\d]*)((?<variable>\\w?)|\\^(?<power>\\d))+$", RegexOptions.Compiled);
+        private readonly HashSet<AlgebraicSummand> _summands;
 
         public float Multiplier { get; private set; }
         public HashSet<AlgebraicVariable> Variables { get; private set; }
-        private readonly HashSet<AlgebraicSummand> _summands;
+        public int Priority => Variables.Any() ? Variables.Max(v => v.Power) : 0;
+
 
         private AlgebraicSummand()
         {
             _summands = new HashSet<AlgebraicSummand>();
         }
 
+        #region Equality members
 
         /// <summary>
         /// 
@@ -27,9 +31,21 @@ namespace TestApp.Math
         /// <returns></returns>
         public bool Equals(AlgebraicSummand other)
         {
-            throw new NotImplementedException();
+            return Variables.SetEquals(other.Variables)
+                && _summands.SetEquals(other._summands);
         }
 
+        #endregion
+
+        #region Overrides of Object
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return ToString().GetHashCode();
+        }
+
+        #endregion
 
         /// <summary>
         /// 
@@ -58,7 +74,7 @@ namespace TestApp.Math
                 return false;
             }
 
-            var regex = Regex.Match(input, PATTERN);
+            var regex = Pattern.Match(input);
             TryParseMultiplier(regex.Groups["multiplier"].Value, out var multiplier);
             summand = new AlgebraicSummand
             {
@@ -89,7 +105,7 @@ namespace TestApp.Math
         /// <returns></returns>
         public static bool IsValid(string input)
         {
-            return Regex.IsMatch(input, PATTERN);
+            return Pattern.IsMatch(input);
         }
 
 
@@ -151,7 +167,7 @@ namespace TestApp.Math
                 sb.Append(float.IsNegative(Multiplier) ? Symbols.Minus : Symbols.Plus);
                 if (Variables.Count == 0 && _summands.Count == 0)
                 {
-                    sb.Append(Multiplier);
+                    sb.Append(System.Math.Abs(Multiplier));
                 }
             }
             else
@@ -187,7 +203,25 @@ namespace TestApp.Math
                 sb.Append(Symbols.CloseBracket);
             }
 
-            return sb.ToString();
+            var result = sb.ToString();
+            return result.Replace(',', Symbols.AllowedFloatPoints[0]);
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="smd1"></param>
+        /// <param name="smd2"></param>
+        /// <returns></returns>
+        public static AlgebraicSummand operator -(AlgebraicSummand smd1, AlgebraicSummand smd2)
+        {
+            smd1.Variables.UnionWith(smd2.Variables);
+            return new AlgebraicSummand
+            {
+                Multiplier = smd1.Multiplier - smd2.Multiplier,
+                Variables = smd1.Variables
+            };
         }
 
 
@@ -209,7 +243,7 @@ namespace TestApp.Math
                 input = "-1";
             }
 
-            return float.TryParse(input, out multiplier);
+            return float.TryParse(input, NumberStyles.Number, CultureInfo.InvariantCulture, out multiplier);
         }
     }
 }

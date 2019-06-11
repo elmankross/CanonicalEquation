@@ -6,7 +6,7 @@ namespace TestApp.Math
 {
     public class AlgebraicExpression
     {
-        public HashSet<AlgebraicSummand> Summands { get; }
+        public HashSet<AlgebraicSummand> Summands { get; private set; }
 
         private AlgebraicExpression()
         {
@@ -109,6 +109,71 @@ namespace TestApp.Math
                 res = res.Remove(0, 1);
             }
             return res;
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="exp1"></param>
+        /// <param name="exp2"></param>
+        /// <returns></returns>
+        public static AlgebraicExpression operator -(AlgebraicExpression exp1, AlgebraicExpression exp2)
+        {
+            var result = new AlgebraicExpression();
+            var freeSummands = new HashSet<AlgebraicSummand>();
+            var usedSummands = new HashSet<AlgebraicSummand>();
+
+            foreach (var exp1Summand in exp1.Summands)
+            {
+                foreach (var exp2Summand in exp2.Summands)
+                {
+                    if (exp1Summand.Equals(exp2Summand))
+                    {
+                        var resExp = exp1Summand - exp2Summand;
+                        if (!resExp.Multiplier.Equals(0f))
+                        {
+                            result.Summands.Add(resExp);
+                        }
+
+                        freeSummands.Remove(exp1Summand);
+                        freeSummands.Remove(exp2Summand);
+                        usedSummands.Add(exp1Summand);
+                        usedSummands.Add(exp2Summand);
+                        break;
+                    }
+                    else
+                    {
+                        if (!usedSummands.Contains(exp2Summand))
+                        {
+                            freeSummands.Add(exp2Summand);
+                        }
+                    }
+                }
+
+                if (!usedSummands.Contains(exp1Summand))
+                {
+                    result.Summands.Add(exp1Summand);
+                }
+            }
+
+            foreach (var freeSummand in freeSummands)
+            {
+                AlgebraicSummand.TryParse("0", out var zeroSummand, out _);
+                result.Summands.Add(zeroSummand - freeSummand);
+            }
+
+            return result;
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public void Normilize()
+        {
+            Summands = Summands.OrderByDescending(summand => summand.Priority).ToHashSet();
         }
 
 
