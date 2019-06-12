@@ -108,8 +108,7 @@ namespace TestApp.Math
 
             if (input.Equals("-"))
             {
-                multiplier = -1f;
-                return true;
+                input = "-1";
             }
 
             return float.TryParse(input, out multiplier);
