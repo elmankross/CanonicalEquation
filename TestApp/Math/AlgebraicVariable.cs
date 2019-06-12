@@ -21,6 +21,7 @@ namespace TestApp.Math
         public override string ToString()
         {
             var sb = new StringBuilder();
+
             sb.Append(Name);
             if (Power != 1)
             {

@@ -24,7 +24,7 @@ namespace TestApp.InputOutput
 
         public void WriteOutput(string result)
         {
-            throw new System.NotImplementedException();
+            File.AppendAllLines($"{_filePath}.out", new[] { result });
         }
     }
 }

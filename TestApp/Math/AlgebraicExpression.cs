@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
@@ -35,7 +36,7 @@ namespace TestApp.Math
                 return false;
             }
 
-            if (TryParseSummand(input, out var summands, out error))
+            if (TryParseSummands(input, out var summands, out error))
             {
                 foreach (var summand in summands)
                 {
@@ -51,7 +52,7 @@ namespace TestApp.Math
         /// 
         /// </summary>
         /// <returns></returns>
-        private static bool TryParseSummand(string input, out HashSet<AlgebraicSummand> summands, out string error)
+        private static bool TryParseSummands(string input, out HashSet<AlgebraicSummand> summands, out string error)
         {
             summands = new HashSet<AlgebraicSummand>();
             error = null;
@@ -66,9 +67,9 @@ namespace TestApp.Math
                 else
                 {
                     var (outer, inter) = AlgebraicSummand.Unwrap(enumerator.Current);
-                    if (TryParseSummand(outer, out var outerSummands, out error))
+                    if (TryParseSummands(outer, out var outerSummands, out error))
                     {
-                        if (TryParseSummand(inter, out var interSummands, out error))
+                        if (TryParseSummands(inter, out var interSummands, out error))
                         {
                             if (outerSummands.Count > 1)
                             {
@@ -79,7 +80,7 @@ namespace TestApp.Math
                                 var outerSummand = outerSummands.First();
                                 foreach (var interSummand in interSummands)
                                 {
-                                    outerSummand.AddSubsummand(interSummand);
+                                    outerSummand.Summands.Add(interSummand);
                                 }
                                 summands.Add(outerSummand);
                             }
@@ -108,7 +109,7 @@ namespace TestApp.Math
             {
                 res = res.Remove(0, 1);
             }
-            return res;
+            return res.Replace("+0", string.Empty).Replace("-0", string.Empty);
         }
 
 
@@ -121,46 +122,10 @@ namespace TestApp.Math
         public static AlgebraicExpression operator -(AlgebraicExpression exp1, AlgebraicExpression exp2)
         {
             var result = new AlgebraicExpression();
-            var freeSummands = new HashSet<AlgebraicSummand>();
-            var usedSummands = new HashSet<AlgebraicSummand>();
 
-            foreach (var exp1Summand in exp1.Summands)
+            foreach (var resultSummand in MathUnion(exp1.Summands, exp2.Summands))
             {
-                foreach (var exp2Summand in exp2.Summands)
-                {
-                    if (exp1Summand.Equals(exp2Summand))
-                    {
-                        var resExp = exp1Summand - exp2Summand;
-                        if (!resExp.Multiplier.Equals(0f))
-                        {
-                            result.Summands.Add(resExp);
-                        }
-
-                        freeSummands.Remove(exp1Summand);
-                        freeSummands.Remove(exp2Summand);
-                        usedSummands.Add(exp1Summand);
-                        usedSummands.Add(exp2Summand);
-                        break;
-                    }
-                    else
-                    {
-                        if (!usedSummands.Contains(exp2Summand))
-                        {
-                            freeSummands.Add(exp2Summand);
-                        }
-                    }
-                }
-
-                if (!usedSummands.Contains(exp1Summand))
-                {
-                    result.Summands.Add(exp1Summand);
-                }
-            }
-
-            foreach (var freeSummand in freeSummands)
-            {
-                AlgebraicSummand.TryParse("0", out var zeroSummand, out _);
-                result.Summands.Add(zeroSummand - freeSummand);
+                result.Summands.Add(resultSummand);
             }
 
             return result;
@@ -170,9 +135,111 @@ namespace TestApp.Math
         /// <summary>
         /// 
         /// </summary>
+        /// <param name="left"></param>
+        /// <param name="right"></param>
+        /// <returns></returns>
+        private static HashSet<AlgebraicSummand> MathUnion(HashSet<AlgebraicSummand> left, HashSet<AlgebraicSummand> right)
+        {
+            var usedRight = new HashSet<AlgebraicSummand>();
+            var usedLeft = new HashSet<AlgebraicSummand>();
+            var resTemp = new HashSet<AlgebraicSummand>();
+            var res = new HashSet<AlgebraicSummand>();
+
+            foreach (var l in left)
+            {
+                foreach (var r in right)
+                {
+                    if (l.TheSame(r))
+                    {
+                        resTemp.Remove(l);
+                        resTemp.Add(l - r);
+
+                        usedLeft.Add(l);
+                        usedRight.Add(r);
+
+                        break;
+                    }
+                }
+
+                if (!usedLeft.Contains(l))
+                {
+                    resTemp.Add(l);
+                }
+            }
+
+            foreach (var r in right)
+            {
+                if (!usedRight.Contains(r))
+                {
+                    AlgebraicSummand.TryParse("0", out var zeroSummand, out _);
+                    resTemp.Add(zeroSummand - r);
+                }
+            }
+
+            usedLeft.Clear();
+            usedRight.Clear();
+
+            foreach (var temp1 in resTemp)
+            {
+                foreach (var temp2 in resTemp)
+                {
+                    if (temp1.Equals(temp2))
+                    {
+                        continue;
+                    }
+
+                    if (temp1.TheSame(temp2))
+                    {
+                        res.Remove(temp1);
+                        res.Remove(temp2);
+                        res.Add(temp1 + temp2);
+                        usedLeft.Add(temp1);
+                        continue;
+                    }
+                    res.Add(temp2);
+                }
+
+                if (!usedLeft.Contains(temp1))
+                {
+                    res.Add(temp1);
+                }
+            }
+
+            usedLeft.Clear();
+            return res;
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
         /// <returns></returns>
         public void Normilize()
         {
+            var replaces = new Dictionary<AlgebraicSummand, HashSet<AlgebraicSummand>>();
+            foreach (var summand in Summands)
+            {
+                if (summand.TryNormilize())
+                {
+                    replaces.TryAdd(summand, summand.Summands);
+                }
+            }
+
+            foreach (var replace in replaces)
+            {
+                // FIXME: после выполнения TryNormilize элемент в хеше меняется и удаление за n(1) уже не работает
+                var temp = Summands.ToList();
+                if (temp.Remove(replace.Key))
+                {
+                    foreach (var v in replace.Value)
+                    {
+                        temp.Add(v);
+                    }
+
+                    Summands = temp.ToHashSet();
+                }
+            }
+
             Summands = Summands.OrderByDescending(summand => summand.Priority).ToHashSet();
         }
 

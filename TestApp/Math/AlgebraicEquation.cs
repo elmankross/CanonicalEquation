@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text;
 
 namespace TestApp.Math
 {
@@ -68,11 +69,9 @@ namespace TestApp.Math
         /// </summary>
         public void ToCanonicalForm()
         {
-            LeftExpression = LeftExpression - RightExpression;
-            if (AlgebraicExpression.TryParse("0", out var rightExpression, out _))
-            {
-                RightExpression = rightExpression;
-            }
+            LeftExpression -= RightExpression;
+            AlgebraicExpression.TryParse("0", out var rightExpression, out _);
+            RightExpression = rightExpression;
             LeftExpression.Normilize();
         }
 
@@ -83,7 +82,10 @@ namespace TestApp.Math
         /// <returns></returns>
         public override string ToString()
         {
-            return $"{LeftExpression}{Symbols.Equal}{RightExpression}";
+            return new StringBuilder().Append(LeftExpression)
+                                      .Append(Symbols.Equal)
+                                      .Append(RightExpression)
+                                      .ToString();
         }
     }
 }
