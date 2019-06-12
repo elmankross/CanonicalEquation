@@ -24,7 +24,10 @@ namespace TestApp.InputOutput
             while (!_isCanceled)
             {
                 Console.Write("Equation: ");
-                yield return Console.ReadLine();
+                if (!_isCanceled)
+                {
+                    yield return Console.ReadLine();
+                }
             }
         }
 
