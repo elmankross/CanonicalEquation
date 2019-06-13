@@ -27,26 +27,27 @@ namespace Logic
         /// <returns></returns>
         public bool MoveNext()
         {
-            for (; _currentIndex < _input.Length; _currentIndex++)
+            for (; _currentIndex < _input.Length ; _currentIndex++)
             {
                 var currentSymbol = _input[_currentIndex];
 
                 if (currentSymbol == Symbols.OPEN_BRACKET)
                 {
-                    var endBlockIndex = _input.LastIndexOf(Symbols.CLOSE_BRACKET);
+                    var endBlockIndex = _input.LastIndexOf(Symbols.CLOSE_BRACKET) + 1;
                     _buffer.Append(_input.Substring(_currentIndex, endBlockIndex - _currentIndex));
-                    Current = _buffer.ToString();
-                    _buffer.Clear();
-                    return true;
+                    _currentIndex = endBlockIndex;
+                    return IndicateFound();
                 }
 
                 if (currentSymbol == Symbols.MINUS || currentSymbol == Symbols.PLUS)
                 {
-                    if (_buffer.Length != 0)
+                    var prevSymbol = _input[_currentIndex - 1];
+                    if (prevSymbol != Symbols.POWER)
                     {
-                        Current = _buffer.ToString();
-                        _buffer.Clear();
-                        return true;
+                        if (_buffer.Length != 0)
+                        {
+                            return IndicateFound();
+                        }
                     }
                 }
 
@@ -55,9 +56,7 @@ namespace Logic
 
             if (_buffer.Length != 0)
             {
-                Current = _buffer.ToString();
-                _buffer.Clear();
-                return true;
+                return IndicateFound();
             }
 
             return false;
@@ -80,6 +79,18 @@ namespace Logic
         public void Dispose()
         {
             Reset();
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        private bool IndicateFound()
+        {
+            Current = _buffer.ToString();
+            _buffer.Clear();
+            return true;
         }
     }
 }

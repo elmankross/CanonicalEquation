@@ -6,6 +6,7 @@
 
         public const char MINUS = '-';
         public const char PLUS = '+';
+        public const char POWER = '^';
 
         public const char OPEN_BRACKET = '(';
         public const char CLOSE_BRACKET = ')';

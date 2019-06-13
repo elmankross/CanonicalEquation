@@ -17,6 +17,9 @@ namespace Tests
         [InlineData("-1.0zyyyx", "-xy^3z")]
         [InlineData("-(xyz)", "-(xyz)")]
         [InlineData("-(xyz-zyx)", "-(xyz-xyz)")]
+        [InlineData("-x(xyz-zyx)", "-x(xyz-xyz)")]
+        [InlineData("-x(y(xyz-zyx))", "-x(y(xyz-xyz))")]
+        [InlineData("x(xyz-zyx(x-y))", "+x(xyz-xyz(x-y))")]
         public void ParseSummand__ShouldBeOk(string input, string expected)
         {
             var parseResult = Summand.TryParse(input, out var summand);

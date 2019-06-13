@@ -13,6 +13,8 @@ namespace Logic.Entities
         public HashSet<Variable> Variables { get; }
         public HashSet<Summand> Summands { get; }
 
+        // Help to avoid double brackets during parsing subsummands. Like -((xyz-xyz))
+        private bool _isSubsummands;
         private readonly Guid _id;
         private readonly StringBuilder _buffer;
         private const string MULTIPLIER_GROUP = "multiplier";
@@ -21,6 +23,7 @@ namespace Logic.Entities
 
         private Summand()
         {
+            _isSubsummands = false;
             _id = Guid.NewGuid();
             _buffer = new StringBuilder();
             Variables = new HashSet<Variable>();
@@ -37,8 +40,8 @@ namespace Logic.Entities
             summand = new Summand();
             var result = new CallResult();
 
-            // COMPLEX SUMMAND
-            if (input.Contains(Symbols.OPEN_BRACKET))
+            // 1. Complex summand
+            if (CheckComplexSummand(input))
             {
                 var startBlock = input.IndexOf(Symbols.OPEN_BRACKET) + 1;
                 var endBlock = input.LastIndexOf(Symbols.CLOSE_BRACKET);
@@ -55,10 +58,40 @@ namespace Logic.Entities
                     return result;
                 }
 
-                simpleSummand.Summands.Add(complexSummand);
+                if (complexSummand._isSubsummands)
+                {
+                    foreach (var s in complexSummand.Summands)
+                    {
+                        simpleSummand.Summands.Add(s);
+                    }
+                }
+                else
+                {
+                    simpleSummand.Summands.Add(complexSummand);
+                }
+
                 summand = simpleSummand;
             }
-            // SIMPLE SUMMAND
+            // 2. Subsummands
+            else if (CheckSubsummands(input))
+            {
+                var summandsEnumerator = new SummandsEnumerator(input);
+                while (summandsEnumerator.MoveNext())
+                {
+                    var parseResult = TryParse(summandsEnumerator.Current, out var simpleSummand);
+                    if (!parseResult.IsSuccessfull)
+                    {
+                        result.AddError("Invalid summand input format", summandsEnumerator.Current);
+                        return result;
+                    }
+
+                    summand.Summands.Add(simpleSummand);
+                }
+
+                // HACK: helps to avoid double brackets outside
+                summand._isSubsummands = true;
+            }
+            // 3. Simple summand
             else if (Pattern.IsMatch(input))
             {
                 var regex = Pattern.Match(input);
@@ -85,41 +118,14 @@ namespace Logic.Entities
                 }
 
                 var multiplierStr = regex.Groups[MULTIPLIER_GROUP].Value;
-                if (!string.IsNullOrEmpty(multiplierStr))
+                var multiplierParseResult = TryParseMultiplier(multiplierStr, out var multiplier);
+                if (!multiplierParseResult.IsSuccessfull)
                 {
-                    if (multiplierStr == "-")
-                    {
-                        multiplierStr = "-1";
-                    }
-
-                    if (!float.TryParse(multiplierStr, NumberStyles.Number, CultureInfo.InvariantCulture, out var multiplier))
-                    {
-                        result.AddError("Invalid multiplier summand format", multiplierStr);
-                        return result;
-                    }
-
-                    summand.Multiplier = multiplier;
+                    multiplierParseResult.CopyErrorsTo(result);
+                    return result;
                 }
-                else
-                {
-                    summand.Multiplier = 1f;
-                }
-            }
-            // SUMMANDS
-            else if (input.Contains(Symbols.PLUS) || input.Contains(Symbols.MINUS))
-            {
-                var summandsEnumerator = new SummandsEnumerator(input);
-                while (summandsEnumerator.MoveNext())
-                {
-                    var parseResult = TryParse(summandsEnumerator.Current, out var simpleSummand);
-                    if (!parseResult.IsSuccessfull)
-                    {
-                        result.AddError("Invalid summand input format", summandsEnumerator.Current);
-                        return result;
-                    }
 
-                    summand.Summands.Add(simpleSummand);
-                }
+                summand.Multiplier = multiplier;
             }
             else
             {
@@ -197,6 +203,105 @@ namespace Logic.Entities
             }
 
             return _buffer.ToString();
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="input"></param>
+        /// <param name="multiplier"></param>
+        /// <returns></returns>
+        private static CallResult TryParseMultiplier(string input, out float multiplier)
+        {
+            var result = new CallResult();
+            if (!string.IsNullOrEmpty(input))
+            {
+                input = input == "-" ? "-1" : input;
+
+                if (!float.TryParse(input, NumberStyles.Number, CultureInfo.InvariantCulture, out multiplier))
+                {
+                    result.AddError("Invalid multiplier summand format", input);
+                }
+            }
+            else
+            {
+                multiplier = 1f;
+            }
+
+            return result;
+        }
+
+
+        /// <summary>
+        /// Check if the input has format like: ax^k+ax^k
+        /// </summary>
+        /// <returns></returns>
+        private static bool CheckSubsummands(string input)
+        {
+            var startSearchIndex = input.StartsWith(Symbols.MINUS) || input.StartsWith(Symbols.PLUS)
+                ? 1
+                : 0;
+
+            for (; startSearchIndex < input.Length ; startSearchIndex++)
+            {
+                var nstSignIndex = input.IndexOf(Symbols.PLUS, startSearchIndex) != -1
+                                   ? input.IndexOf(Symbols.PLUS, startSearchIndex)
+                                   : input.IndexOf(Symbols.MINUS, startSearchIndex);
+                var prevSignSymbolIsPower = nstSignIndex > 0 && input[nstSignIndex - 1] == Symbols.POWER;
+
+                if (input.Contains(Symbols.OPEN_BRACKET) && input.Contains(Symbols.CLOSE_BRACKET))
+                {
+                    var nstOpenBracketIndex = input.IndexOf(Symbols.OPEN_BRACKET, startSearchIndex);
+                    var nstCloseBracketIndex = input.IndexOf(Symbols.CLOSE_BRACKET, startSearchIndex);
+
+                    if (nstOpenBracketIndex != -1 && nstCloseBracketIndex != -1)
+                    {
+                        var bracketsRange = Enumerable.Range(nstOpenBracketIndex,
+                            nstCloseBracketIndex - nstOpenBracketIndex);
+                        if (nstSignIndex != -1)
+                        {
+                            return !bracketsRange.Contains(nstSignIndex);
+                        }
+
+                        if (startSearchIndex < input.Length)
+                        {
+                            continue;
+                        }
+
+                        return false;
+                    }
+                }
+                else
+                {
+                    return nstSignIndex != -1 && !prevSignSymbolIsPower;
+                }
+            }
+            return false;
+        }
+
+
+        /// <summary>
+        /// Check if the input has format like ax^k(ax^k+ax^k)
+        /// </summary>
+        /// <param name="input"></param>
+        /// <returns></returns>
+        private static bool CheckComplexSummand(string input)
+        {
+            var beginBlockIndex = input.IndexOf(Symbols.OPEN_BRACKET);
+            var endBlockIndex = input.LastIndexOf(Symbols.CLOSE_BRACKET);
+
+            if (beginBlockIndex == -1)
+            {
+                return false;
+            }
+
+            if (endBlockIndex != input.Length - 1)
+            {
+                return false;
+            }
+
+            return Pattern.IsMatch(input.Substring(0, beginBlockIndex));
         }
     }
 }
