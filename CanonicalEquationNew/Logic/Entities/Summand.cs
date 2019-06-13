@@ -10,8 +10,8 @@ namespace Logic.Entities
     public class Summand : IEquatable<Summand>
     {
         public float Multiplier { get; private set; }
-        public HashSet<Variable> Variables { get; }
-        public HashSet<Summand> Summands { get; }
+        public HashSet<Variable> Variables { get; private set; }
+        public HashSet<Summand> Summands { get; private set; }
 
         // Help to avoid double brackets during parsing subsummands. Like -((xyz-xyz))
         private bool _isSubsummands;
@@ -111,9 +111,10 @@ namespace Logic.Entities
                         return result;
                     }
 
-                    if (summand.Variables.Contains(variable))
+                    if (summand.Variables.Any(v => v.Name == variable.Name))
                     {
-                        summand.Variables.TryGetValue(variable, out var existsVariable);
+                        var existsVariable = summand.Variables.Single(v => v.Name == variable.Name);
+                        //summand.Variables.TryGetValue(variable, out var existsVariable);
                         summand.Variables.Remove(existsVariable);
                         summand.Variables.Add(existsVariable * variable);
                     }
@@ -145,11 +146,108 @@ namespace Logic.Entities
         /// <summary>
         /// 
         /// </summary>
+        /// <param name="summands"></param>
+        /// <returns></returns>
+        public bool TrySimplify(out HashSet<Summand> summands)
+        {
+            summands = null;
+            if (Summands.Count > 0)
+            {
+                summands = new HashSet<Summand>(Summands.Count);
+                foreach (var summand in Summands)
+                {
+                    if (summand.TrySimplify(out var subsummands))
+                    {
+                        foreach (var subsummand in subsummands)
+                        {
+                            summands.Add(subsummand);
+                        }
+                    }
+                    else
+                    {
+                        summands.Add(this * summand);
+                    }
+                }
+
+                return true;
+            }
+            return false;
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public bool CanAdd(Summand other)
+        {
+            return Variables.SetEquals(other.Variables);
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
         /// <param name="other"></param>
         /// <returns></returns>
         public bool Equals(Summand other)
         {
             return _id == other._id;
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="left"></param>
+        /// <param name="right"></param>
+        /// <returns></returns>
+        public static Summand operator +(Summand left, Summand right)
+        {
+            var result = new Summand();
+            if (left.Variables.SetEquals(right.Variables))
+            {
+                result.Variables = left.Variables;
+                result.Multiplier = left.Multiplier + right.Multiplier;
+            }
+
+            return result;
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="left"></param>
+        /// <param name="right"></param>
+        /// <returns></returns>
+        public static Summand operator *(Summand left, Summand right)
+        {
+            var resultSummand = new Summand
+            {
+                Multiplier = left.Multiplier * right.Multiplier,
+            };
+
+            var variables = left.Variables.ToList();
+            variables.AddRange(right.Variables);
+            resultSummand.Variables = variables.GroupBy(v => v.Name)
+                                               .Aggregate(new List<Variable>(), (set, grouping) =>
+                                                {
+                                                    var result = grouping.Aggregate((current, next) => current * next);
+                                                    set.Add(result);
+                                                    return set;
+                                                }).ToHashSet();
+
+            return resultSummand;
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public void Invert()
+        {
+            Multiplier *= -1;
         }
 
 
@@ -191,19 +289,10 @@ namespace Logic.Entities
             if (Summands.Count > 0)
             {
                 _buffer.Append(Symbols.OPEN_BRACKET);
-                var index = 0;
-                foreach (var summand in Summands)
+                var summandEnumerator = new TrimerEnumerator<Summand>(Summands);
+                while (summandEnumerator.MoveNext())
                 {
-                    var smdString = summand.ToString();
-                    if (index == 0)
-                    {
-                        if (smdString.StartsWith(Symbols.PLUS) || smdString.StartsWith(Symbols.MINUS))
-                        {
-                            smdString = smdString.Remove(0, 1);
-                        }
-                    }
-                    _buffer.Append(smdString);
-                    index++;
+                    _buffer.Append(summandEnumerator.Current);
                 }
                 _buffer.Append(Symbols.CLOSE_BRACKET);
             }
@@ -250,7 +339,7 @@ namespace Logic.Entities
                 ? 1
                 : 0;
 
-            for (; startSearchIndex < input.Length ; startSearchIndex++)
+            for (; startSearchIndex < input.Length; startSearchIndex++)
             {
                 var plusIndex = input.IndexOf(Symbols.PLUS, startSearchIndex);
                 var minusIndex = input.IndexOf(Symbols.MINUS, startSearchIndex);

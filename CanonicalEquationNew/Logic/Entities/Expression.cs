@@ -50,6 +50,31 @@ namespace Logic.Entities
         }
 
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="left"></param>
+        /// <param name="right"></param>
+        /// <returns></returns>
+        public static Expression operator -(Expression left, Expression right)
+        {
+            var result = new Expression();
+
+            foreach (var summand in left.Summands)
+            {
+                result.Summands.Add(summand);
+            }
+
+            foreach (var summand in right.Summands)
+            {
+                summand.Invert();
+                result.Summands.Add(summand);
+            }
+
+            return result;
+        }
+
+
         #region Overrides of Object
 
         /// <inheritdoc />
@@ -57,17 +82,22 @@ namespace Logic.Entities
         {
             _buffer.Clear();
 
-            var index = 0;
-            foreach (var summand in Summands)
+            var summandEnumerator = new TrimerEnumerator<Summand>(Summands, false);
+            while (summandEnumerator.MoveNext())
             {
-                var summandStr = summand.ToString();
-                if (index == 0)
+                if (summandEnumerator.CurrentIndex == 0)
                 {
-                    summandStr = summandStr.StartsWith(Symbols.PLUS) ? summandStr.Remove(0, 1) : summandStr;
+                    summandEnumerator.TrimBeginPlusSymbol();
+                }
+                else
+                {
+                    if (summandEnumerator.CurrentObject.Multiplier.Equals(0))
+                    {
+                        summandEnumerator.TrimBeginZero();
+                    }
                 }
 
-                _buffer.Append(summandStr);
-                index++;
+                _buffer.Append(summandEnumerator.Current);
             }
 
             return _buffer.ToString();

@@ -83,7 +83,8 @@ namespace Logic.Entities
         /// <returns></returns>
         public bool Equals(Variable other)
         {
-            return Name.Equals(other.Name);
+            return Name.Equals(other.Name)
+                && Power.Equals(other.Power);
         }
 
 
@@ -93,7 +94,7 @@ namespace Logic.Entities
         /// <returns></returns>
         public override int GetHashCode()
         {
-            return Name.GetHashCode();
+            return ToString().GetHashCode();
         }
 
 

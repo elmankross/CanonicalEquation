@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Collections.Generic;
+using System.Text;
 
 namespace Logic.Entities
 {
@@ -63,7 +64,87 @@ namespace Logic.Entities
         /// <returns></returns>
         public Equation GetCanonicalForm()
         {
-            return new Equation();
+            var result = new Equation
+            {
+                LeftExpression = LeftExpression - RightExpression
+            };
+
+            Expression.TryParse("0", out var rightExpression);
+            result.RightExpression = rightExpression;
+
+            var resultSummands = new HashSet<Summand>();
+            foreach (var summand in result.LeftExpression.Summands)
+            {
+                if (summand.TrySimplify(out var simplifiedSummands))
+                {
+                    foreach (var simplifiedSummand in simplifiedSummands)
+                    {
+                        resultSummands.Add(simplifiedSummand);
+                    }
+                }
+                else
+                {
+                    resultSummands.Add(summand);
+                }
+            }
+
+            while (true)
+            {
+                var used = new HashSet<Summand>();
+                var subtrated = new HashSet<Summand>();
+                var breakerCount = 0;
+
+                foreach (var o in resultSummands)
+                {
+                    foreach (var i in resultSummands)
+                    {
+                        if (o.Equals(i))
+                        {
+                            breakerCount++;
+                            continue;
+                        }
+
+                        if (o.CanAdd(i))
+                        {
+                            if (!used.Contains(o) && !used.Contains(i))
+                            {
+                                subtrated.Add(o + i);
+                                used.Add(o);
+                                used.Add(i);
+                                break;
+                            }
+                        }
+
+                        breakerCount++;
+                    }
+                }
+
+                if (breakerCount == resultSummands.Count * resultSummands.Count)
+                {
+                    result.LeftExpression.Summands.Clear();
+                    foreach (var u in used)
+                    {
+                        result.LeftExpression.Summands.Add(u);
+                    }
+                    foreach (var r in resultSummands)
+                    {
+                        result.LeftExpression.Summands.Add(r);
+                    }
+                    break;
+                }
+
+                foreach (var u in used)
+                {
+                    resultSummands.Remove(u);
+                }
+
+                foreach (var s in subtrated)
+                {
+                    resultSummands.Add(s);
+                }
+            }
+
+            return result;
         }
 
 
