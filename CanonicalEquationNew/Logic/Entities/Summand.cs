@@ -19,7 +19,7 @@ namespace Logic.Entities
         private readonly StringBuilder _buffer;
         private const string MULTIPLIER_GROUP = "multiplier";
         private const string VARIABLE_GROUP = "variable";
-        private static readonly Regex Pattern = new Regex($"^(?<{MULTIPLIER_GROUP}>\\-*\\d*\\.*\\,*\\d*)(?<{VARIABLE_GROUP}>(\\w\\^\\-*\\d|\\w))*$", RegexOptions.Compiled);
+        private static readonly Regex Pattern = new Regex($"^(?<{MULTIPLIER_GROUP}>[\\-\\+]*\\d*\\.*\\,*\\d*)(?<{VARIABLE_GROUP}>(\\w\\^\\-*\\d|\\w))*$", RegexOptions.Compiled);
 
         private Summand()
         {
@@ -40,6 +40,12 @@ namespace Logic.Entities
             summand = new Summand();
             var result = new CallResult();
 
+            if (string.IsNullOrEmpty(input))
+            {
+                result.AddError("Summand is empty");
+                return result;
+            }
+
             // 1. Complex summand
             if (CheckComplexSummand(input))
             {
@@ -47,7 +53,7 @@ namespace Logic.Entities
                 var endBlock = input.LastIndexOf(Symbols.CLOSE_BRACKET);
 
                 // Base part of complex summand. All outside brackets
-                var parseResultSimple = TryParse(input.Substring(0, startBlock - 1), out var simpleSummand);
+                var parseResultSimple = TryParse(startBlock == 1 ? "1" : input.Substring(0, startBlock - 1), out var simpleSummand);
                 // Internal part of complex summand. All inside brackets
                 var parseResultComplex = TryParse(input.Substring(startBlock, endBlock - startBlock), out var complexSummand);
 
@@ -129,7 +135,7 @@ namespace Logic.Entities
             }
             else
             {
-                result.AddError("Invalid summand input format", input);
+                result.AddError("Invalid summand format", input);
             }
 
             return result;
@@ -157,14 +163,14 @@ namespace Logic.Entities
 
             if (Math.Abs(Multiplier).Equals(0))
             {
-                return _buffer.ToString();
+                return _buffer.Append(Multiplier).ToString();
             }
 
             _buffer.Append(float.IsNegative(Multiplier) ? Symbols.MINUS : Symbols.PLUS);
 
             if (Math.Abs(Multiplier).Equals(1))
             {
-                if (Variables.Count == 0 && Summands.Count == 0)
+                if (Variables.Count(v => v.Power != 0) == 0 && Summands.Count == 0)
                 {
                     _buffer.Append(Math.Abs(Multiplier));
                 }
@@ -218,6 +224,7 @@ namespace Logic.Entities
             if (!string.IsNullOrEmpty(input))
             {
                 input = input == "-" ? "-1" : input;
+                input = input == "+" ? "+1" : input;
 
                 if (!float.TryParse(input, NumberStyles.Number, CultureInfo.InvariantCulture, out multiplier))
                 {
@@ -245,9 +252,28 @@ namespace Logic.Entities
 
             for (; startSearchIndex < input.Length ; startSearchIndex++)
             {
-                var nstSignIndex = input.IndexOf(Symbols.PLUS, startSearchIndex) != -1
-                                   ? input.IndexOf(Symbols.PLUS, startSearchIndex)
-                                   : input.IndexOf(Symbols.MINUS, startSearchIndex);
+                var plusIndex = input.IndexOf(Symbols.PLUS, startSearchIndex);
+                var minusIndex = input.IndexOf(Symbols.MINUS, startSearchIndex);
+                var nstSignIndex = 0;
+
+                if (plusIndex == -1 && minusIndex == -1)
+                {
+                    return false;
+                }
+
+                if (plusIndex == -1)
+                {
+                    nstSignIndex = minusIndex;
+                }
+                else if (minusIndex == -1)
+                {
+                    nstSignIndex = plusIndex;
+                }
+                else
+                {
+                    nstSignIndex = Math.Min(plusIndex, minusIndex);
+                }
+
                 var prevSignSymbolIsPower = nstSignIndex > 0 && input[nstSignIndex - 1] == Symbols.POWER;
 
                 if (input.Contains(Symbols.OPEN_BRACKET) && input.Contains(Symbols.CLOSE_BRACKET))
