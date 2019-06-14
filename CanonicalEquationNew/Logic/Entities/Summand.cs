@@ -7,11 +7,26 @@ using System.Text.RegularExpressions;
 
 namespace Logic.Entities
 {
-    public class Summand : IEquatable<Summand>
+    public class Summand : IEquatable<Summand>, ICloneable
     {
         public float Multiplier { get; private set; }
         public HashSet<Variable> Variables { get; private set; }
-        public HashSet<Summand> Summands { get; private set; }
+        public HashSet<Summand> Summands { get; }
+
+        public float Priority
+        {
+            get
+            {
+                var priority = 0f;
+                if (Variables.Count > 0)
+                {
+                    priority += (float)Variables.Sum(v => Math.Pow(v.Power, 2)) / Variables.Count;
+                    priority += Variables.Sum(v => 122 - v.Name); // 122 - Max unicode character code
+                }
+
+                return priority;
+            }
+        }
 
         // Help to avoid double brackets during parsing subsummands. Like -((xyz-xyz))
         private bool _isSubsummands;
@@ -160,7 +175,7 @@ namespace Logic.Entities
                     {
                         foreach (var subsummand in subsummands)
                         {
-                            summands.Add(subsummand);
+                            summands.Add(this * subsummand);
                         }
                     }
                     else
@@ -181,7 +196,11 @@ namespace Logic.Entities
         /// <returns></returns>
         public bool CanAdd(Summand other)
         {
-            return Variables.SetEquals(other.Variables);
+            return Variables.All(v => v.Power == 0) && other.Variables.All(v => v.Power == 0)
+                || Variables.Count == 0 && other.Variables.Count == 0
+                || Multiplier.Equals(0) && other.Variables.Count == 0
+                || other.Multiplier.Equals(0) && Variables.Count == 0
+                || Variables.SetEquals(other.Variables);
         }
 
 
@@ -210,6 +229,8 @@ namespace Logic.Entities
                 result.Variables = left.Variables;
                 result.Multiplier = left.Multiplier + right.Multiplier;
             }
+
+            result.Multiplier = left.Multiplier + right.Multiplier;
 
             return result;
         }
@@ -248,6 +269,26 @@ namespace Logic.Entities
         public void Invert()
         {
             Multiplier *= -1;
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public void Sort()
+        {
+            var newSet = new HashSet<Summand>();
+            foreach (var summand in Summands.OrderByDescending(s => s.Priority))
+            {
+                summand.Sort();
+                newSet.Add(summand);
+            }
+
+            Summands.Clear();
+            foreach (var s in newSet)
+            {
+                Summands.Add(s);
+            }
         }
 
 
@@ -301,6 +342,25 @@ namespace Logic.Entities
         }
 
 
+        /// <inheritdoc />
+        public object Clone()
+        {
+            var clone = new Summand
+            {
+                Multiplier = Multiplier,
+                Variables = new HashSet<Variable>(Variables),
+                _isSubsummands = _isSubsummands
+            };
+
+            foreach (var summand in Summands.Select(s => s.Clone()))
+            {
+                clone.Summands.Add(summand as Summand);
+            }
+
+            return clone;
+        }
+
+
         /// <summary>
         /// 
         /// </summary>
@@ -339,7 +399,7 @@ namespace Logic.Entities
                 ? 1
                 : 0;
 
-            for (; startSearchIndex < input.Length; startSearchIndex++)
+            for (; startSearchIndex < input.Length ; startSearchIndex++)
             {
                 var plusIndex = input.IndexOf(Symbols.PLUS, startSearchIndex);
                 var minusIndex = input.IndexOf(Symbols.MINUS, startSearchIndex);

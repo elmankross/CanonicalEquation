@@ -4,7 +4,7 @@ using CanonicalEquation.IO;
 
 namespace App.IO
 {
-    internal class FileInputOutputProvider : IInputOutputProvider
+    internal class FileInputOutputProvider : InputOutputProvider
     {
         private readonly string _dstFilePath;
         private readonly string _srcFilePath;
@@ -16,15 +16,15 @@ namespace App.IO
         }
 
 
-        public IEnumerable<string> Read()
+        public override IEnumerable<string> Read()
         {
             return File.ReadLines(_srcFilePath);
         }
 
 
-        public void Write(string line)
+        public override void Write(string line)
         {
-            File.AppendAllText(_dstFilePath, line);
+            File.AppendAllLines(_dstFilePath, new[] { line });
         }
     }
 }

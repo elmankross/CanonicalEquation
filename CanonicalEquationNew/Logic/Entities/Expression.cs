@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Logic.Entities
@@ -60,15 +61,16 @@ namespace Logic.Entities
         {
             var result = new Expression();
 
-            foreach (var summand in left.Summands)
+            foreach (var summand in left.Summands.Select(s => s.Clone()))
             {
-                result.Summands.Add(summand);
+                result.Summands.Add(summand as Summand);
             }
 
-            foreach (var summand in right.Summands)
+            foreach (var summand in right.Summands.Select(s => s.Clone()))
             {
-                summand.Invert();
-                result.Summands.Add(summand);
+                var res = summand as Summand;
+                res.Invert();
+                result.Summands.Add(res);
             }
 
             return result;

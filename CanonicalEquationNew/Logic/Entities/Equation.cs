@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Logic.Entities
@@ -93,6 +95,7 @@ namespace Logic.Entities
                 var used = new HashSet<Summand>();
                 var subtrated = new HashSet<Summand>();
                 var breakerCount = 0;
+                var breakerLimit = (int)Math.Pow(resultSummands.Count, 2);
 
                 foreach (var o in resultSummands)
                 {
@@ -119,20 +122,6 @@ namespace Logic.Entities
                     }
                 }
 
-                if (breakerCount == resultSummands.Count * resultSummands.Count)
-                {
-                    result.LeftExpression.Summands.Clear();
-                    foreach (var u in used)
-                    {
-                        result.LeftExpression.Summands.Add(u);
-                    }
-                    foreach (var r in resultSummands)
-                    {
-                        result.LeftExpression.Summands.Add(r);
-                    }
-                    break;
-                }
-
                 foreach (var u in used)
                 {
                     resultSummands.Remove(u);
@@ -141,6 +130,20 @@ namespace Logic.Entities
                 foreach (var s in subtrated)
                 {
                     resultSummands.Add(s);
+                }
+
+                used.Clear();
+                subtrated.Clear();
+
+                if (breakerCount == breakerLimit)
+                {
+                    result.LeftExpression.Summands.Clear();
+                    foreach (var r in resultSummands.OrderByDescending(s => s.Priority))
+                    {
+                        r.Sort();
+                        result.LeftExpression.Summands.Add(r);
+                    }
+                    break;
                 }
             }
 

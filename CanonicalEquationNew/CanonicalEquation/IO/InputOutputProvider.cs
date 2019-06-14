@@ -1,10 +1,26 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using App;
+using App.IO;
 
 namespace CanonicalEquation.IO
 {
-    public interface IInputOutputProvider
+    public abstract class InputOutputProvider
     {
-        IEnumerable<string> Read();
-        void Write(string line);
+        public static InputOutputProvider Get(ConsoleArgs cfg)
+        {
+            switch (cfg.Mode)
+            {
+                case Mode.Interactive:
+                    return new ConsoleInputOutputProvider();
+                case Mode.File:
+                    return new FileInputOutputProvider(cfg.FilePath);
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(cfg.Mode), cfg.Mode, null);
+            }
+        }
+
+        public abstract IEnumerable<string> Read();
+        public abstract void Write(string line);
     }
 }

@@ -4,7 +4,7 @@ using CanonicalEquation.IO;
 
 namespace App.IO
 {
-    internal class ConsoleInputOutputProvider : IInputOutputProvider
+    internal class ConsoleInputOutputProvider : InputOutputProvider
     {
         private bool _isCanceled;
 
@@ -14,7 +14,7 @@ namespace App.IO
         }
 
 
-        public IEnumerable<string> Read()
+        public override IEnumerable<string> Read()
         {
             while (!_isCanceled)
             {
@@ -27,7 +27,7 @@ namespace App.IO
         }
 
 
-        public void Write(string line)
+        public override void Write(string line)
         {
             Console.Write("Result: ");
             Console.WriteLine(line);
