@@ -19,5 +19,19 @@ namespace Tests
             Assert.True(parseResult.IsSuccessfull, parseResult.GetErrorsString());
             Assert.Equal(expected, expression.ToString());
         }
+
+
+        [Theory]
+        [InlineData("x-2", "x+1", "x-2-x-1")]
+        [InlineData("xyz", "xy", "xyz-xy")]
+        [InlineData("x(x-y)", "x(x-y)", "x(x-y)-x(x-y)")]
+        public void SubtractExpression__ShouldLeadToRightResult(string leftExp, string rightExp, string expectedResult)
+        {
+            Expression.TryParse(leftExp, out var leftExpression);
+            Expression.TryParse(rightExp, out var rightExpression);
+
+            var resultExpression = leftExpression - rightExpression;
+            Assert.Equal(expectedResult, resultExpression.ToString());
+        }
     }
 }

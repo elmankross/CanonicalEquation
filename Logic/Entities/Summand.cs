@@ -21,14 +21,14 @@ namespace Logic.Entities
                 if (Variables.Count > 0)
                 {
                     priority += (float)Variables.Sum(v => Math.Pow(v.Power, 2)) / Variables.Count;
-                    priority += Variables.Sum(v => 122 - v.Name); // 122 - Max unicode character code
+                    priority += Variables.Sum(v => 'z' - v.Name);
                 }
 
                 return priority;
             }
         }
 
-        // Help to avoid double brackets during parsing subsummands. Like -((xyz-xyz))
+        // Helps to avoid double brackets during parsing subsummands. Like -((xyz-xyz))
         private bool _isSubsummands;
         private readonly Guid _id;
         private readonly StringBuilder _buffer;
@@ -64,13 +64,13 @@ namespace Logic.Entities
             // 1. Complex summand
             if (CheckComplexSummand(input))
             {
-                var startBlock = input.IndexOf(Symbols.OPEN_BRACKET) + 1;
+                var beginBlock = input.IndexOf(Symbols.OPEN_BRACKET) + 1;
                 var endBlock = input.LastIndexOf(Symbols.CLOSE_BRACKET);
 
                 // Base part of complex summand. All outside brackets
-                var parseResultSimple = TryParse(startBlock == 1 ? "1" : input.Substring(0, startBlock - 1), out var simpleSummand);
+                var parseResultSimple = TryParse(beginBlock == 1 ? "1" : input.Substring(0, beginBlock - 1), out var simpleSummand);
                 // Internal part of complex summand. All inside brackets
-                var parseResultComplex = TryParse(input.Substring(startBlock, endBlock - startBlock), out var complexSummand);
+                var parseResultComplex = TryParse(input.Substring(beginBlock, endBlock - beginBlock), out var complexSummand);
 
                 if (!parseResultSimple.IsSuccessfull || !parseResultComplex.IsSuccessfull)
                 {
@@ -227,7 +227,6 @@ namespace Logic.Entities
             if (left.Variables.SetEquals(right.Variables))
             {
                 result.Variables = left.Variables;
-                result.Multiplier = left.Multiplier + right.Multiplier;
             }
 
             result.Multiplier = left.Multiplier + right.Multiplier;
@@ -316,10 +315,7 @@ namespace Logic.Entities
             }
             else
             {
-                if (!Math.Abs(Multiplier).Equals(0))
-                {
-                    _buffer.Append(Math.Abs(Multiplier));
-                }
+                _buffer.Append(Math.Abs(Multiplier));
             }
 
             foreach (var variable in Variables.OrderBy(v => v.Name))
@@ -399,7 +395,7 @@ namespace Logic.Entities
                 ? 1
                 : 0;
 
-            for (; startSearchIndex < input.Length ; startSearchIndex++)
+            for (; startSearchIndex < input.Length; startSearchIndex++)
             {
                 var plusIndex = input.IndexOf(Symbols.PLUS, startSearchIndex);
                 var minusIndex = input.IndexOf(Symbols.MINUS, startSearchIndex);
